@@ -217,7 +217,8 @@ SELECT * FROM TF_JOGOS
 ORDER BY DATA_JOGO;
 
 -- SELECIONA TODOS OS JOGOS E EXIBE O NOME DOS TIMES PARTICIPANTES, ASSIM COMO O RESULTADO
-SELECT j.id_jogo JOGO, j.data_jogo DATA, mandante.nome MANDANTE, gols_mandante GOLS, visitante.nome VISITANTE, gols_visitante GOLS,
+-- SELECIONA TODOS OS JOGOS E EXIBE O NOME DOS TIMES PARTICIPANTES, ASSIM COMO O RESULTADO
+SELECT j.id_jogo JOGO, TO_CHAR(j.data_jogo, 'dd/mm/yyyy hh24:mi') DATA, mandante.nome MANDANTE, gols_mandante GOLS, visitante.nome VISITANTE, gols_visitante GOLS,
   CASE
     WHEN gols_mandante > gols_visitante THEN mandante.nome
     WHEN gols_mandante < gols_visitante THEN visitante.nome
