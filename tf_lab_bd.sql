@@ -219,7 +219,7 @@ INSERT INTO TF_JOGOS VALUES (23, 13, 1, 14, 0, TO_DATE('2017-05-27 21:00', 'yyyy
 INSERT INTO TF_JOGOS VALUES (24, 17, 4,  2, 3, TO_DATE('2017-05-27 19:00', 'yyyy-mm-dd hh24:mi'));
 
 
--------------------- CONSULTAS ----------------------------
+------------- CONSULTAS PARA AVALIAÇÃO DOS DADOS INSERIDOS ---------------------
 -- SELECIONA TODOS OS ESTADOS
 SELECT * FROM TF_ESTADOS
 ORDER BY ID_ESTADO;
@@ -239,3 +239,191 @@ ORDER BY ID_JOGADOR;
 -- SELECIONA TODOS OS JOGOS
 SELECT * FROM TF_JOGOS
 ORDER BY DATA_JOGO;
+
+
+--------------------------------------------------------------------------------
+--------------------------- CONSULTAS DESENVOLVIDAS ----------------------------
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+------------------------------ Consultas básicas -------------------------------
+--------------------------------------------------------------------------------
+-- 5 consultas básicas envolvendo os comandos distinct, order by, count(*),
+-- like, in e funções de manipulação de datas.
+
+-- 1. Nomes de todos os jogadores nascidos entre de 1992 e 2007.
+SELECT nome FROM tf_jogadores
+WHERE data_nascimento BETWEEN
+      TO_DATE('1992-01-01', 'YYYY-MM-DD') AND
+      TO_DATE('2007-12-31', 'YYYY-MM-DD');
+
+-- 2. Nomes de todas as cidades que começam com a letra 'P'.
+SELECT nome FROM tf_cidades
+WHERE nome LIKE 'P%';
+
+-- 3. Nomes de todos os clubes e número de anos em atividade.
+SELECT nome,
+    EXTRACT(YEAR FROM SYSDATE) - EXTRACT(YEAR FROM data_fundacao) anos_atividade
+FROM tf_times;
+
+-- 4. Total de gols em julho de 2017.
+SELECT SUM(tf_jogos.gols_mandante) + SUM(tf_jogos.gols_visitante) total_de_gols
+FROM tf_jogos
+WHERE data_jogo BETWEEN
+    TO_DATE('2017-07-01', 'YYYY-MM-DD') AND
+    TO_DATE('2017-07-31', 'YYYY-MM-DD');
+
+-- 5. Média de gols por partida (dentre todas as partidas cadastradas).
+SELECT AVG(tf_jogos.gols_mandante + tf_jogos.gols_visitante) media_gols
+FROM tf_jogos;
+
+
+--------------------------------------------------------------------------------
+------------------------- Consultas envolvendo junções -------------------------
+--------------------------------------------------------------------------------
+-- 5 consultas das quais 2 envolvam junções entre duas tabelas e 3 envolvam
+-- junções entre três ou mais tabelas.
+
+-- 1. Selecionar as datas de todos os jogos, nomes das cidades e dos estados
+--    onde aconteceram.
+SELECT tf_jogos.data_jogo AS data, tf_cidades.nome AS cidade,
+       tf_estados.nome AS estado
+FROM tf_jogos
+    JOIN tf_times ON tf_times.id_time = tf_jogos.id_mandante
+    JOIN tf_cidades ON tf_cidades.id_cidade = tf_times.id_cidade
+    JOIN tf_estados ON tf_estados.id_estado = tf_cidades.id_estado;
+
+-- 2. Selecionar as datas de todos os jogos, times envolvidos e resultado.
+SELECT TO_CHAR(tf_jogos.data_jogo, 'dd/mm/yyyy hh24:mi') data,
+  t1.nome mandante,
+	  tf_jogos.gols_mandante,
+  t2.nome visitante,
+  tf_jogos.GOLS_VISITANTE FROM tf_jogos
+    JOIN tf_times t1 ON t1.id_time = tf_jogos.id_mandante
+    JOIN tf_times t2 ON t2.id_time = tf_jogos.id_visitante;
+
+-- 3. Selecionar o estado de origem de cada time.
+SELECT tf_times.nome time, tf_estados.nome estado FROM tf_times
+    JOIN tf_cidades ON tf_cidades.id_cidade = tf_times.id_cidade
+    JOIN tf_estados ON tf_estados.id_estado = tf_cidades.id_estado;
+
+-- 4. Selecionar o nome do jogador, o nome de sua cidade natal e sua idade.
+SELECT tf_jogadores.nome nome,
+       tf_cidades.nome cidade_natal,
+       EXTRACT(YEAR FROM SYSDATE) -
+          EXTRACT(YEAR FROM tf_jogadores.data_nascimento) idade
+    FROM tf_jogadores
+    JOIN tf_cidades ON tf_cidades.id_cidade = tf_jogadores.id_cidade_nascimento;
+
+-- 5. Data e total de gols das partidas acontecidas em cidades fundadas há mais de 150 anos.
+SELECT TO_CHAR(tf_jogos.data_jogo, 'dd/mm/yyyy hh24:mi') data,
+       tf_jogos.gols_mandante + tf_jogos.gols_visitante gols
+FROM tf_jogos
+	JOIN tf_times ON tf_times.id_time = tf_jogos.id_mandante
+	JOIN tf_cidades ON tf_cidades.id_cidade = tf_times.id_cidade
+WHERE EXTRACT(YEAR FROM tf_cidades.data_fundacao) < EXTRACT(YEAR FROM SYSDATE) - 150
+ORDER BY gols DESC;
+
+
+--------------------------------------------------------------------------------
+----------------------- Consultas envolvendo agregações ------------------------
+--------------------------------------------------------------------------------
+-- 5 consultas envolvendo group by e having, juntamente com funções de agregação
+
+-- 1. Nomes das cidades e quantidade de clubes por cidade.
+SELECT tf_cidades.nome nome_cidade,
+       count(tf_times.id_time) clubes
+FROM tf_cidades
+    JOIN tf_times ON tf_times.id_cidade = tf_cidades.id_cidade
+GROUP BY tf_cidades.nome
+ORDER BY clubes DESC;
+
+-- 2. Cidades cuja média da idade dos jogadores seja maior que 30 anos.
+SELECT tf_cidades.nome nome_cidade FROM tf_cidades
+    JOIN tf_jogadores ON
+        tf_jogadores.id_cidade_nascimento = tf_cidades.id_cidade
+GROUP BY tf_cidades.nome
+HAVING AVG(EXTRACT(YEAR FROM SYSDATE) -
+       EXTRACT(YEAR FROM tf_jogadores.data_nascimento)) > 30;
+
+-- 3. Nomes dos times que jogaram pelo menos 2 jogos fora de casa em 2017 e
+--    quantidade de jogos.
+SELECT tf_times.nome nome_time, COUNT(tf_jogos.id_jogo) jogos_visitante
+FROM tf_times
+    JOIN tf_jogos ON tf_jogos.id_visitante = tf_times.id_time
+WHERE tf_jogos.data_jogo BETWEEN
+        TO_DATE('2017-01-01', 'YYYY-MM-DD') AND
+        TO_DATE('2017-12-31', 'YYYY-MM-DD')
+GROUP BY tf_times.nome
+HAVING COUNT(tf_jogos.id_jogo) >= 2
+ORDER BY jogos_visitante DESC;
+
+-- 4. Nome das cidades e quantidade de jogadores nascidos na cidade
+SELECT tf_cidades.nome nome_cidade,
+  COUNT(tf_jogadores.nome) jogadores FROM tf_cidades
+    JOIN tf_jogadores ON tf_jogadores.id_cidade_nascimento = tf_cidades.id_cidade
+GROUP BY tf_cidades.nome
+ORDER BY jogadores DESC;
+
+-- 5. Nome das cidades e quantidade de jogos por cidade
+SELECT tf_cidades.nome nome_cidade,
+  COUNT(tf_jogos.id_mandante) cidade FROM tf_cidades
+    JOIN tf_jogos ON tf_jogos.id_mandante = tf_times.id_time
+    JOIN tf_times ON tf_times.id_cidade = tf_cidades.id_cidade
+GROUP BY tf_cidades.nome
+ORDER BY cidade DESC;
+
+
+--------------------------------------------------------------------------------
+--------------------- Consultas envolvendo sub-consultas -----------------------
+--------------------------------------------------------------------------------
+-- 5 consultas envolvendo sub-consultas.
+
+-- 1. Nomes dos jogadores cujos clubes jogaram pelo menos dois jogos em 2017.
+SELECT nome FROM tf_jogadores
+WHERE id_time IN
+  (SELECT id_time FROM tf_times, tf_jogos
+      WHERE tf_jogos.id_mandante = tf_times.id_time OR
+            tf_jogos.id_visitante = tf_times.id_time AND
+            tf_jogos.data_jogo BETWEEN
+              TO_DATE('2017-01-01', 'YYYY-MM-DD') AND
+              TO_DATE('2017-12-31', 'YYYY-MM-DD')
+  GROUP BY id_time
+  HAVING COUNT(*) >= 2);
+
+-- 2. Nomes dos estados que possuem cidades que sediaram pelo menos um jogo
+--    entre janeiro de 2016 e dezembro de 2017.
+SELECT tf_estados.nome FROM tf_estados
+    JOIN tf_cidades ON tf_cidades.id_estado = tf_estados.id_estado
+WHERE tf_cidades.id_cidade IN
+  (SELECT tf_times.id_cidade FROM tf_times
+      JOIN tf_jogos ON tf_jogos.id_mandante = tf_times.id_time
+      WHERE tf_jogos.data_jogo BETWEEN
+        TO_DATE('2016-01-01', 'YYYY-MM-DD') AND
+  	    TO_DATE('2017-12-31', 'YYYY-MM-DD')
+      GROUP BY tf_times.id_cidade
+      HAVING COUNT(*) >= 1);
+
+-- 3. Nomes dos estados que possuem pelo menos dois clubes.
+SELECT DISTINCT tf_estados.nome FROM tf_estados
+    JOIN tf_cidades ON tf_cidades.id_estado = tf_estados.id_estado
+    WHERE tf_cidades.id_cidade IN
+        (SELECT id_cidade FROM tf_times
+         GROUP BY id_cidade
+         HAVING COUNT(*) >= 2);
+
+-- 4. Selecionar cidades que poderiam ter um time de futebol contando apenas com
+--    nativos (cidades que tenham sido berço de pelo menos 11 jogadores).
+SELECT nome AS cidade FROM tf_cidades
+    WHERE id_cidade IN
+        (SELECT id_cidade_nascimento FROM tf_jogadores
+            GROUP BY id_cidade_nascimento
+            HAVING COUNT(*) >= 11);
+
+-- 5. O estado onde nasceu o jogador mais velho cadastrado.
+SELECT tf_estados.nome nome_estado FROM tf_estados
+    JOIN tf_cidades ON tf_cidades.id_estado = tf_estados.id_estado
+    JOIN tf_jogadores ON tf_jogadores.id_cidade_nascimento = tf_cidades.id_cidade
+WHERE EXTRACT(YEAR FROM SYSDATE) - EXTRACT(YEAR FROM tf_jogadores.data_nascimento) =
+    (SELECT MAX(EXTRACT(YEAR FROM SYSDATE) -
+            EXTRACT(YEAR FROM data_nascimento)) idade_maxima FROM tf_jogadores);
